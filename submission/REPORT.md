@@ -47,28 +47,39 @@
 
 ## 4. Logging và PII
 
-- **Cách tạo/nhận và truyền correlation ID:**
-- **Các metadata được ghi vào structured log:**
-- **Cách bảo đảm PII được scrub trước khi ghi:**
-- **Cách kiểm chứng kết quả:**
+- **Cách tạo/nhận và truyền correlation ID:** `CorrelationIdMiddleware` xóa context cũ qua `clear_contextvars()`, kiểm tra header `x-request-id` (nếu hợp lệ định dạng `req-<8-hex>` thì giữ, ngược lại tự động tạo mới `f"req-{uuid.uuid4().hex[:8]}"`). Sau đó bind vào `structlog` contextvars qua `bind_contextvars(correlation_id=correlation_id)` và lưu vào `request.state.correlation_id`. Cuối cùng trả về correlation ID và thời gian xử lý trong header response `x-request-id`, `x-response-time-ms`.
+- **Các metadata được ghi vào structured log:** `user_id_hash` (băm SHA256 12 ký tự), `session_id`, `feature`, `model`, `env`, `ts` (ISO UTC), `level`, `service`, `event`, `latency_ms`, `ttft_ms`, `tokens_in`, `tokens_out`, `cost_usd`, `quality_score`, `tool_name`, `tool_success`.
+- **Cách bảo đảm PII được scrub trước khi ghi:** Sử dụng structlog processor `scrub_event` đặt trước `JsonlFileProcessor` và `JSONRenderer`. Processor này duyệt đệ quy qua các payload/event và áp dụng regex `scrub_text` để thay thế email, số điện thoại VN, CCCD, thẻ thanh toán thành `[REDACTED_<TYPE>]` trước khi log được serialize hoặc ghi vào file `data/logs.jsonl`.
+- **Cách kiểm chứng kết quả:** Xóa log cũ, chạy lại `python scripts/load_test.py` và kiểm tra bằng `python scripts/validate_logs.py` (đạt 100/100, 0 PII leak) cùng test suite `python -m pytest -q`.
 
 ## 5. Tracing và prompt versioning
 
-- **Cách xác nhận traces do chính tôi tạo trong project cá nhân:**
-- **Cấu trúc root/retrieval/generation observations:**
-- **Cách nối trace với log:**
-- **Prompt name:**
-- **Version/label baseline:**
-- **Version/label candidate:**
-- **Trace ID của mỗi version:**
+- **Cách xác nhận traces do chính tôi tạo trong project cá nhân:** Các traces hiển thị rõ tên project cá nhân `day13-k4-l3a-<MSSV>` trên Langfuse Cloud, gắn metadata `user_id_hash`, `session_id`, `correlation_id` khớp với request do tôi chạy trong load test.
+- **Cấu trúc root/retrieval/generation observations:** Root observation là `lab-agent-run` (type `agent`), bên dưới gồm hai child observations: `retrieval` (type `retriever`) thực hiện tìm kiếm tài liệu và `generation` (type `generation`) gọi LLM nhận đầy đủ model, prompt, token usage và cost.
+- **Cách nối trace với log:** Cả structured log và trace đều chia sẻ chung một `correlation_id` duy nhất (được bind từ middleware và truyền vào metadata của trace).
+- **Prompt name:** `day13-chat`
+- **Version/label baseline:** Version 1 (gắn label `baseline`, ban đầu gắn `production`)
+- **Version/label candidate:** Version 2 (gắn label `candidate`)
+- **Trace ID của mỗi version:** *(Học viên điền trace ID thực tế lấy từ Langfuse sau khi chạy)*
 - **Cách promote và rollback `production`:**
+  - Promote: Trong Langfuse UI, chuyển label `production` sang Version 2 rồi gửi request kiểm tra.
+  - Rollback: Chuyển lại label `production` về Version 1 và lưu evidence.
 
 ## 6. Dashboard, SLO và alerts
 
-- **Dashboard và sáu panel:**
-- **SLO và lý do chọn:**
-- **Cách tính error budget:**
+- **Dashboard và sáu panel:** Được cấu hình theo chuẩn contract `config/dashboard.yaml` với 6 panel:
+  1. `Latency`: P50, P95, P99 và TTFT P95 (đơn vị: ms, threshold P95 <= 3000ms).
+  2. `Traffic`: Số lượng request theo phút (đơn vị: requests/min, threshold >= 1).
+  3. `Errors`: Tỷ lệ lỗi % và tỷ lệ truy xuất thành công (đơn vị: %, threshold error rate <= 2%).
+  4. `Cost`: Chi phí ước tính theo phút và tổng chi phí (đơn vị: USD, threshold <= 2.5$).
+  5. `Tokens`: Tổng số input và output tokens (đơn vị: tokens, threshold <= 50000).
+  6. `Quality`: Điểm chất lượng trung bình (đơn vị: score 0-1, threshold >= 0.75).
+- **SLO và lý do chọn:** Primary SLO `fast_successful_requests` đặt mục tiêu 99.5% requests thành công và có độ trễ <= 3000ms trong chu kỳ 28 ngày. Lý do chọn: Chatbot AI tương tác trực tiếp với người dùng nên độ trễ dưới 3s là ngưỡng quan trọng để giữ chân người dùng và đảm bảo trải nghiệm hội thoại mượt mà.
+- **Cách tính error budget:** Error budget = 100% - 99.5% = 0.5% tổng số request. Ví dụ nếu hệ thống phục vụ 100,000 requests trong 28 ngày thì error budget cho phép tối đa 500 requests bị lỗi hoặc chậm (> 3000ms). Khi error budget cạn kiệt, team kỹ thuật sẽ đóng băng việc release tính năng mới để tập trung fix lỗi hệ thống và tối ưu RAG.
 - **Ba alert và runbook tương ứng:**
+  1. `high_latency_p95`: warning, kích hoạt khi `latency_p95_ms > 3000` trong 5 phút. Runbook: `docs/alerts.md#alert-1`.
+  2. `high_error_rate`: critical, kích hoạt khi `error_rate_pct > 2` trong 5 phút. Runbook: `docs/alerts.md#alert-2`.
+  3. `retrieval_degradation`: warning, kích hoạt khi `retrieval_success_rate_pct < 90` trong 10 phút. Runbook: `docs/alerts.md#alert-3`.
 
 ## 7. Điều tra challenge
 
