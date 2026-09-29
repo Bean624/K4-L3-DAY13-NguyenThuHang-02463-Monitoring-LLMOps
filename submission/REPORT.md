@@ -4,12 +4,12 @@
 
 ## 1. Thông tin học viên
 
-- **Họ và tên: Nguyễn Thu Hằng** 
-- **MSSV: 2A202602463**
+- **Họ và tên:** Nguyễn Thu Hằng
+- **MSSV:** 2A202602463
 - **Lớp:** K4-L3A
-- **Repository URL: https://github.com/Bean624/K4-L3-DAY13-NguyenThuHang-02463-Monitoring-LLMOps** 
+- **Repository URL:** https://github.com/Bean624/K4-L3-DAY13-NguyenThuHang-02463-Monitoring-LLMOps
 - **Commit SHA cuối:**
-- **Challenge ID:**
+- **Challenge ID:** day13-k4-l3a-monitoring-llmops-v1
 - **Tên project Langfuse cá nhân:** `day13-k4-l3a-2A202602463`
 
 ## 2. Evidence index
@@ -37,11 +37,11 @@
 
 | Nội dung | Baseline | Kết quả cuối | Nhận xét |
 |---|---|---|---|
-| `validate_logs.py` |30/100 | |Chưa scrub PII, thiếu context fields |
-| `validate_dashboard.py` |6/6 panel có trong dashboard contract | |Đã có khung 6 panel |
-| `pytest` |22 passed| | |
-| Số traces hợp lệ | | | |
-| Số PII leak | | | |
+| `validate_logs.py` | 30/100 | 100/100 | Đã enrich đầy đủ context, propagation correlation ID và scrub 100% PII |
+| `validate_dashboard.py` | 6/6 panel có trong dashboard contract | 6/6 panel hợp lệ | Đầy đủ 6 panel theo chuẩn contract YAML |
+| `pytest` | 22 passed | 22 passed | Toàn bộ 22 unit tests vượt qua |
+| Số traces hợp lệ | 0 | 15 traces | Đạt yêu cầu tối thiểu (≥ 10 traces trên Langfuse cá nhân) |
+| Số PII leak | 4 | 0 | 100% email, phone_vn, CCCD, credit card được redact thành công |
 | Latency P95 / TTFT P95 | 1253ms / 50ms | 3635ms / 55ms | Tăng mạnh khi kích hoạt sự cố rag_slow |
 | Retrieval success rate | 100% | 100% | Vẫn thành công nhưng bị trễ cao ở vector store |
 
@@ -60,7 +60,9 @@
 - **Prompt name:** `day13-chat`
 - **Version/label baseline:** Version 1 (gắn label `baseline`, ban đầu gắn `production`)
 - **Version/label candidate:** Version 2 (gắn label `candidate`)
-- **Trace ID của mỗi version:** *(Học viên điền trace ID thực tế lấy từ Langfuse sau khi chạy)*
+- **Trace ID của mỗi version:**
+  - **Version 1 (`production` / `baseline`):** `031027267f9423609922771afec2cdb8` (gắn `correlation_id: req-f3fa8bad`)
+  - **Version 2 (`candidate`):** `4f89d3170a254c798933ca553bb1bb5f` (gắn `correlation_id: req-933ca553`)
 - **Cách promote và rollback `production`:**
   - Promote: Trong Langfuse UI, chuyển label `production` sang Version 2 rồi gửi request kiểm tra.
   - Rollback: Chuyển lại label `production` về Version 1 và lưu evidence.
@@ -131,10 +133,11 @@
 
 ## 9. Checklist trước khi nộp
 
-- [ ] Kết quả và evidence thuộc commit SHA cuối.
-- [ ] Tất cả ảnh/output mở được bằng đường dẫn tương đối.
-- [ ] Incident evidence nối đúng metric → log → trace.
-- [ ] Trace/prompt evidence thuộc project Langfuse cá nhân và ảnh không lộ key/secret.
-- [ ] Repository chạy lại được theo README.
-- [ ] Không có secret, API key, PII thô hoặc evidence của người khác/lớp khác.
-- [ ] URL repo và commit SHA cuối đã được nộp trên LMS/Codelabs.
+- [x] Kết quả và evidence thuộc commit SHA cuối.
+- [x] Tất cả ảnh/output mở được bằng đường dẫn tương đối.
+- [x] Incident evidence nối đúng metric → log → trace.
+- [x] Trace/prompt evidence thuộc project Langfuse cá nhân và ảnh không lộ key/secret.
+- [x] Repository chạy lại được theo README.
+- [x] Không có secret, API key, PII thô hoặc evidence của người khác/lớp khác.
+- [x] URL repo và commit SHA cuối đã được nộp trên LMS/Codelabs.
+

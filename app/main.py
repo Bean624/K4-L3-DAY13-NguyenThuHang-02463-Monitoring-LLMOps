@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import json
 import os
+import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from structlog.contextvars import bind_contextvars
 
 from .agent import LabAgent
+from .dashboard_view import render_dashboard_html
 from .incidents import disable, enable, status
+from .mock_rag import retrieve
 from .logging_config import configure_logging, get_logger
 from .metrics import record_error, snapshot
 from .middleware import CorrelationIdMiddleware
@@ -44,6 +49,62 @@ async def health() -> dict:
 @app.get("/metrics")
 async def metrics() -> dict:
     return snapshot()
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard() -> HTMLResponse:
+    return HTMLResponse(
+        content=render_dashboard_html(),
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
+
+
+@app.get("/api/logs")
+async def get_logs(limit: int = 50, event: str | None = None, search: str | None = None) -> list[dict]:
+    log_path = Path("data/logs.jsonl")
+    if not log_path.exists():
+        return []
+    records = []
+    for line in log_path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            try:
+                records.append(json.loads(line))
+            except Exception:
+                pass
+    records.reverse()
+    if event and event != "all":
+        records = [r for r in records if r.get("event") == event]
+    if search:
+        s = search.lower()
+        records = [r for r in records if s in json.dumps(r, ensure_ascii=False).lower()]
+    return records[:limit]
+
+
+@app.post("/api/test-retrieval")
+async def test_retrieval(body: dict) -> dict:
+    query = body.get("query", "")
+    start = time.perf_counter()
+    try:
+        docs = retrieve(query)
+        latency_ms = round((time.perf_counter() - start) * 1000, 2)
+        return {"ok": True, "docs": docs, "count": len(docs), "latency_ms": latency_ms, "query": query}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "latency_ms": round((time.perf_counter() - start) * 1000, 2)}
+
+
+@app.get("/api/prompt-info")
+async def get_prompt_info() -> dict:
+    return {
+        "prompt_name": os.getenv("LANGFUSE_PROMPT_NAME", "day13-chat"),
+        "prompt_label": os.getenv("LANGFUSE_PROMPT_LABEL", "production"),
+        "base_url": os.getenv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com"),
+        "template": "Feature={{feature}}\nDocs={{docs}}\nQuestion={{message}}",
+        "project": "day13-k4-l3a-2A202602463",
+    }
 
 
 @app.post("/chat", response_model=ChatResponse)
