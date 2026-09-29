@@ -4,13 +4,13 @@
 
 ## 1. Thông tin học viên
 
-- **Họ và tên:**
-- **MSSV:**
+- **Họ và tên: Nguyễn Thu Hằng** 
+- **MSSV: 2A202602463**
 - **Lớp:** K4-L3A
-- **Repository URL:**
+- **Repository URL: https://github.com/Bean624/K4-L3-DAY13-NguyenThuHang-02463-Monitoring-LLMOps** 
 - **Commit SHA cuối:**
 - **Challenge ID:**
-- **Tên project Langfuse cá nhân:** `day13-k4-l3a-<MSSV>`
+- **Tên project Langfuse cá nhân:** `day13-k4-l3a-2A202602463`
 
 ## 2. Evidence index
 
@@ -37,9 +37,9 @@
 
 | Nội dung | Baseline | Kết quả cuối | Nhận xét |
 |---|---|---|---|
-| `validate_logs.py` | | | |
-| `validate_dashboard.py` | | | |
-| `pytest` | | | |
+| `validate_logs.py` |30/100 | |Chưa scrub PII, thiếu context fields |
+| `validate_dashboard.py` |6/6 panel có trong dashboard contract | |Đã có khung 6 panel |
+| `pytest` |22 passed| | |
 | Số traces hợp lệ | | | |
 | Số PII leak | | | |
 | Latency P95 / TTFT P95 | | | |
